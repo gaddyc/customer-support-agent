@@ -1,0 +1,32 @@
+# macOS
+.DS_Store
+
+# Python caches and build artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local AgentCore deployment state
+.bedrock_agentcore/
+.bedrock_agentcore.yaml
+
+# Local credentials and environment variables
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# IDE settings
+.vscode/
+.idea/
