@@ -36,7 +36,7 @@ from typing import Dict
 from bedrock_agentcore.tools.code_interpreter_client import code_session
 from strands_tools.browser import AgentCoreBrowser
 
-logging.basicConfig(level=logging.WARNING)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("CSAI_Agent")
 
 # ── TODO 1 — App Initialisation ───────────────────────────────────────────────
@@ -46,7 +46,7 @@ logger = logging.getLogger("CSAI_Agent")
 #
 # Hint: app = BedrockAgentCoreApp()
 
-# Create the BedrockAgentCoreApp instance
+# TODO: Create the BedrockAgentCoreApp instance
 app = BedrockAgentCoreApp()
 
 
@@ -79,13 +79,13 @@ MEMORY_ID   = os.environ.get("MEMORY_ID", "")    # TODO: Replace with your Memor
 
 model_id = "global.amazon.nova-2-lite-v1:0"
 
-# Create the BedrockModel instance
+# TODO: Create the BedrockModel instance
 model = BedrockModel(model_id=model_id, region_name=REGION)
 
-# Create the MemoryClient instance
+# TODO: Create the MemoryClient instance
 memory_client = MemoryClient(region_name=REGION)
 
-# Create the boto3 bedrock-agent-runtime client
+# TODO: Create the boto3 bedrock-agent-runtime client
 _bedrock_runtime = boto3.client("bedrock-agent-runtime", region_name=REGION)
 
 
@@ -512,26 +512,63 @@ internal Customer Context block. Clearly summarize outcomes and next steps.
 Always answer polite and professional.
 """
 
-        if not GATEWAY_URL:
-            raise ValueError(
-                "GATEWAY_URL is not configured. Set it before invoking the agent."
-            )
+        gateway_failure_message = (
+            "I’m sorry, order and refund services are temporarily unavailable. "
+            "Please try again in a few minutes. If the problem continues, "
+            "contact customer support with your order number."
+        )
 
-        mcp_client = MCPClient(
+        if not GATEWAY_URL:
+            logger.error("Gateway configuration is missing")
+            return gateway_failure_message
+
+        gateway_client = MCPClient(
             lambda: streamable_http_client(GATEWAY_URL)
         )
-        with mcp_client:
-            gateway_tools = mcp_client.list_tools_sync()
-            tools.extend(gateway_tools)
-            agent = Agent(
-                model=model,
-                tools=tools,
-                hooks=[memory_hook],
-                system_prompt=system_prompt,
-            )
-            response = agent(user_input)
+        try:
+            with gateway_client:
+                gateway_tools = gateway_client.list_tools_sync()
+                if not gateway_tools:
+                    raise RuntimeError("Gateway returned no tools")
 
-        return response.message["content"][0]["text"]
+                tools.extend(gateway_tools)
+                logger.info(
+                    "Gateway connected successfully. Loaded %d tools.",
+                    len(gateway_tools),
+                )
+
+                agent = Agent(
+                    model=model,
+                    tools=tools,
+                    hooks=[memory_hook],
+                    system_prompt=system_prompt,
+                )
+                response = agent(user_input)
+
+            response_content = response.message.get("content", [])
+            response_text = next(
+                (
+                    block.get("text", "").strip()
+                    for block in response_content
+                    if block.get("text", "").strip()
+                ),
+                "",
+            )
+            if not response_text:
+                raise RuntimeError("Agent returned an empty response")
+            return response_text
+        except TimeoutError:
+            logger.exception("Gateway tool loading or invocation timed out")
+            return gateway_failure_message
+        except ConnectionError:
+            logger.exception("Gateway connection failed")
+            return gateway_failure_message
+        except Exception as exc:
+            logger.exception(
+                "Gateway tool loading or invocation failed: %s",
+                type(exc).__name__,
+            )
+            return gateway_failure_message
     except Exception as exc:
         logger.exception("Customer support invocation failed")
         return (
