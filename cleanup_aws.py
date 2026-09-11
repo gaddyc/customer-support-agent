@@ -17,6 +17,7 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass
+from pathlib import Path
 
 import boto3
 from botocore.exceptions import ClientError
@@ -80,7 +81,12 @@ class Cleanup:
         if not self.execute:
             return
 
-        result = subprocess.run(command, check=False)
+        starter_directory = Path(__file__).resolve().parent / "starter"
+        result = subprocess.run(
+            command,
+            cwd=starter_directory,
+            check=False,
+        )
         if result.returncode != 0:
             print(
                 "[WARNING] AgentCore CLI cleanup failed. Continue with the "
