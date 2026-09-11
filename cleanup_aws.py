@@ -22,8 +22,8 @@ from pathlib import Path
 import boto3
 from botocore.exceptions import ClientError
 
-
-EXPECTED_ACCOUNT_ID = "978050722836"
+# add ACCOUNT_ID
+EXPECTED_ACCOUNT_ID = "ACCOUNT_ID"
 DEFAULT_REGION = "us-east-1"
 
 
